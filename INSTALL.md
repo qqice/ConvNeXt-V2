@@ -5,19 +5,19 @@ We provide installation instructions for ImageNet classification experiments her
 ## Dependency Setup
 Create an new conda virtual environment
 ```
-conda create -n convnextv2 python=3.8 -y
+conda create -n convnextv2 python=3.9 -y
 conda activate convnextv2
 ```
 
 Install [Pytorch](https://pytorch.org/)>=1.8.0, [torchvision](https://pytorch.org/vision/stable/index.html)>=0.9.0 following official instructions. For example:
 ```
-pip install torch==1.8.0+cu111 torchvision==0.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+pip install torch torchvision
 ```
 
 Clone this repo and install required packages:
 ```
-git clone https://github.com/facebookresearch/ConvNeXt-V2.git
-pip install timm==0.3.2 tensorboardX six
+git clone https://github.com/qqice/ConvNeXt-V2.git
+pip install timm==0.4.12 tensorboardX six
 pip install submitit
 conda install openblas-devel -c anaconda -y
 ```
@@ -33,6 +33,7 @@ python setup.py install --blas_include_dirs=${CONDA_PREFIX}/include --blas=openb
 ```
 
 Install apex
+Newest apex now requires Python>=3.9
 ```
 git clone https://github.com/NVIDIA/apex
 cd apex

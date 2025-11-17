@@ -27,14 +27,17 @@ python submitit_pretrain.py --nodes 8 --ngpus 8 \
 The following commands run the pre-training on a single machine:
 
 ```
-python -m torch.distributed.launch --nproc_per_node=8 main_pretrain.py \
---model convnextv2_base \
---batch_size 64 --update_freq 8 \
+python main_pretrain.py \
+--enable_wandb true \
+--wandb_project "convnextv2" \
+--wandb_run_name "atto_pretrain_1600ep" \
+--model convnextv2_atto \
+--batch_size 256 --update_freq 8 \
 --blr 1.5e-4 \
 --epochs 1600 \
 --warmup_epochs 40 \
---data_path /path/to/imagenet-1k \
---output_dir /path/to/save_results
+--data_path /home/qqice/LeafDiseaseDataset \
+--output_dir /home/qqice/ConvNeXt-V2/save_results
 ```
 
 
@@ -117,25 +120,27 @@ python submitit_finetune.py --nodes 4 --ngpus 8 \
 
 The following commands run the fine-tuning on a single machine:
 ```
-python -m torch.distributed.launch --nproc_per_node=8 main_finetune.py \
---model convnextv2_atto \
---batch_size 32 --update_freq 4 \
---blr 2e-4 \
---epochs 600 \
---warmup_epochs 0 \
---layer_decay_type 'single' \
---layer_decay 0.9 \
---weight_decay 0.3 \
---drop_path 0.1 \
---reprob 0.25 \
---mixup 0. \
---cutmix 0. \
---smoothing 0.2 \
---model_ema True --model_ema_eval True \
---use_amp True \
---finetune /path/to/checkpoint \
---data_path /path/to/imagenet-1k \
---output_dir /path/to/save_results
+python main_finetune.py \
+    --enable_wandb true \
+    --wandb_project "leaf-disease-convnextv2-atto-finetune" \
+    --model convnextv2_atto \
+    --finetune fcmae_models/convnextv2_atto_1k_224_fcmae.pt \
+    --batch_size 32 --update_freq 4 \
+    --blr 2e-4 \
+    --epochs 100 \
+    --warmup_epochs 0 \
+    --layer_decay_type 'single' \
+    --layer_decay 0.9 \
+    --weight_decay 0.3 \
+    --drop_path 0.1 \
+    --reprob 0.25 \
+    --mixup 0. \
+    --cutmix 0. \
+    --smoothing 0.2 \
+    --model_ema True --model_ema_eval True \
+    --use_amp True \
+    --data_path /home/qqice/LeafDiseaseDataset \
+    --output_dir ./save_results/finetune_atto
 ```
 </details>
 
@@ -169,12 +174,17 @@ python submitit_finetune.py --nodes 4 --ngpus 8 \
 
 The following commands run the fine-tuning on a single machine:
 ```
-python -m torch.distributed.launch --nproc_per_node=8 main_finetune.py \
---model convnextv2_ \
+python main_finetune.py \
+--enable_wandb true \
+--wandb_project "leaf-disease-convnextv2-tiny-finetune" \
+--model convnextv2_tiny \
+--finetune fcmae_models/convnextv2_tiny_1k_224_fcmae.pt \
+--data_path /home/qqice/LeafDiseaseDataset \
+--output_dir ./save_results/finetune_tiny \
 --batch_size 32 --update_freq 4 \
 --blr 8e-4 \
---epochs 300 \
---warmup_epochs 40 \
+--epochs 100 \
+--warmup_epochs 0 \
 --layer_decay_type 'single' \
 --layer_decay 0.9 \
 --weight_decay 0.05 \
@@ -184,10 +194,7 @@ python -m torch.distributed.launch --nproc_per_node=8 main_finetune.py \
 --cutmix 1.0 \
 --smoothing 0.1 \
 --model_ema True --model_ema_eval True \
---use_amp True \
---finetune /path/to/checkpoint \
---data_path /path/to/imagenet-1k \
---output_dir /path/to/save_results
+--use_amp True 
 ```
 </details>
 
