@@ -17,6 +17,7 @@ def train_one_epoch(model: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, loss_scaler,
                     log_writer=None,
+                    wandb_logger=None,
                     args=None):
     model.train(True)
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -64,7 +65,16 @@ def train_one_epoch(model: torch.nn.Module,
             epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
             log_writer.update(train_loss=loss_value_reduce, head="loss", step=epoch_1000x)
             log_writer.update(lr=lr, head="opt", step=epoch_1000x)
-    
+
+        if wandb_logger is not None and (data_iter_step + 1) % update_freq == 0:
+            """ Log to wandb in real-time """
+            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
+            wandb_logger._wandb.log({
+                'Rank-0 Batch Wise/train_loss': loss_value_reduce,
+                'Rank-0 Batch Wise/learning_rate': lr,
+                'Rank-0 Batch Wise/global_train_step': epoch_1000x,
+            })
+
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}

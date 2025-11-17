@@ -7,6 +7,7 @@
 
 
 import os
+import argparse
 import math
 import time
 from collections import defaultdict, deque
@@ -18,7 +19,7 @@ from pathlib import Path
 
 import torch
 import torch.distributed as dist
-from torch._six import inf
+from torch import inf
 
 from tensorboardX import SummaryWriter
 from collections import OrderedDict
@@ -222,30 +223,48 @@ class WandbLogger(object):
 
         # Initialize a W&B run 
         if self._wandb.run is None:
+            # Prepare config dict from args
+            config_dict = vars(args) if hasattr(args, '__dict__') else args
+            
+            # Set run name
+            run_name = args.wandb_run_name if hasattr(args, 'wandb_run_name') and args.wandb_run_name else None
+            
+            # Initialize wandb
             self._wandb.init(
-                project=args.project,
-                config=args
+                project=args.wandb_project if hasattr(args, 'wandb_project') else 'convnext-v2',
+                entity=args.wandb_entity if hasattr(args, 'wandb_entity') and args.wandb_entity else None,
+                config=config_dict,
+                name=run_name,
+                resume='allow'
             )
 
     def log_epoch_metrics(self, metrics, commit=True):
         """
         Log train/test metrics onto W&B.
         """
+        # Make a copy to avoid modifying the original
+        metrics = metrics.copy()
+        
         # Log number of model parameters as W&B summary
-        self._wandb.summary['n_parameters'] = metrics.get('n_parameters', None)
-        metrics.pop('n_parameters', None)
+        if 'n_parameters' in metrics:
+            self._wandb.summary['n_parameters'] = metrics.get('n_parameters', None)
+            metrics.pop('n_parameters', None)
 
         # Log current epoch
-        self._wandb.log({'epoch': metrics.get('epoch')}, commit=False)
-        metrics.pop('epoch')
+        if 'epoch' in metrics:
+            self._wandb.log({'epoch': metrics.get('epoch')}, commit=False)
+            metrics.pop('epoch')
 
         for k, v in metrics.items():
+            if v is None:
+                continue
             if 'train' in k:
                 self._wandb.log({f'Global Train/{k}': v}, commit=False)
             elif 'test' in k:
                 self._wandb.log({f'Global Test/{k}': v}, commit=False)
 
-        self._wandb.log({})
+        if commit:
+            self._wandb.log({})
 
     def log_checkpoints(self):
         output_dir = self.args.output_dir
@@ -258,10 +277,13 @@ class WandbLogger(object):
 
     def set_steps(self):
         # Set global training step
+        self._wandb.define_metric('Rank-0 Batch Wise/global_train_step')
         self._wandb.define_metric('Rank-0 Batch Wise/*', step_metric='Rank-0 Batch Wise/global_train_step')
         # Set epoch-wise step
+        self._wandb.define_metric('epoch')
         self._wandb.define_metric('Global Train/*', step_metric='epoch')
         self._wandb.define_metric('Global Test/*', step_metric='epoch')
+        self._wandb.define_metric('test/*', step_metric='epoch')
 
 
 def setup_for_distributed(is_master):

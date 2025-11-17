@@ -21,7 +21,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, loss_scaler, max_norm: float = 0,
                     model_ema: Optional[ModelEma] = None, mixup_fn: Optional[Mixup] = None, 
-                    log_writer=None, args=None):
+                    log_writer=None, wandb_logger=None, args=None):
     model.train(True)
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
@@ -110,6 +110,21 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             if use_amp:
                 log_writer.update(grad_norm=grad_norm, head="opt")
             log_writer.set_step()
+        
+        if wandb_logger is not None and (data_iter_step + 1) % update_freq == 0:
+            """ Log to wandb in real-time """
+            wandb_logger._wandb.log({
+                'Rank-0 Batch Wise/train_loss': loss_value,
+                'Rank-0 Batch Wise/learning_rate': max_lr,
+                'Rank-0 Batch Wise/min_lr': min_lr,
+                'Rank-0 Batch Wise/weight_decay': weight_decay_value,
+                'Rank-0 Batch Wise/global_train_step': log_writer.step if log_writer else data_iter_step,
+            }, commit=False)
+            if class_acc is not None:
+                wandb_logger._wandb.log({'Rank-0 Batch Wise/class_acc': class_acc}, commit=False)
+            if use_amp:
+                wandb_logger._wandb.log({'Rank-0 Batch Wise/grad_norm': grad_norm}, commit=False)
+            wandb_logger._wandb.log({})  # Commit the logs
     
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()

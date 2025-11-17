@@ -20,7 +20,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 
 import timm
-assert timm.__version__ == "0.3.2"  # version check
+#assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
 
 from engine_pretrain import train_one_epoch
@@ -93,10 +93,20 @@ def get_args_parser():
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes')
-    parser.add_argument('--local_rank', default=-1, type=int)
+    parser.add_argument('--local-rank', default=-1, type=int)
     parser.add_argument('--dist_on_itp', type=str2bool, default=False)
     parser.add_argument('--dist_url', default='env://',
                         help='url used to set up distributed training')
+    
+    # wandb parameters
+    parser.add_argument('--enable_wandb', type=str2bool, default=False,
+                        help='enable logging to Weights & Biases')
+    parser.add_argument('--wandb_project', default='convnextv2-pretrain', type=str,
+                        help='wandb project name')
+    parser.add_argument('--wandb_entity', default=None, type=str,
+                        help='wandb entity (username or team name)')
+    parser.add_argument('--wandb_run_name', default=None, type=str,
+                        help='wandb run name')
     return parser
 
 def main(args):
@@ -135,6 +145,13 @@ def main(args):
         log_writer = utils.TensorboardLogger(log_dir=args.log_dir)
     else:
         log_writer = None
+    
+    # Initialize wandb
+    if global_rank == 0 and args.enable_wandb:
+        wandb_logger = utils.WandbLogger(args)
+        wandb_logger.set_steps()
+    else:
+        wandb_logger = None
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train, sampler=sampler_train,
@@ -195,6 +212,7 @@ def main(args):
             model, data_loader_train,
             optimizer, device, epoch, loss_scaler,
             log_writer=log_writer,
+            wandb_logger=wandb_logger,
             args=args
         )
         if args.output_dir and args.save_ckpt:
@@ -210,6 +228,9 @@ def main(args):
                 log_writer.flush()
             with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
                 f.write(json.dumps(log_stats) + "\n")
+            # Log epoch metrics to wandb
+            if wandb_logger is not None:
+                wandb_logger.log_epoch_metrics(log_stats)
     
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
